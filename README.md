@@ -28,4 +28,8 @@
 
 ## Summary
 
-Weekend project. Simple snake clone that runs in the console.
+Simple snake clone written in Go as a weekend project.
+
+Runs in the console:
+
+![Screenshot](./images/ss.png)
