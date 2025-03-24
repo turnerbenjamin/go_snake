@@ -15,17 +15,17 @@ var directionMap = map[string]directions.Direction{
 }
 
 
-type InputReader struct {
-	lastChar chan string
+type inputReader struct {
+	input chan string
 }
 
-func (ir *InputReader) readCharBlocking() string{
-    return <- ir.lastChar 
+func (ir *inputReader) waitForInput() string{
+    return <- ir.input 
 }
 
-func (ir *InputReader) checkForCharInput() (bool, string){
+func (ir *inputReader) checkForInput() (bool, string){
         select {
-	case char := <- ir.lastChar:
+	case char := <- ir.input:
         return true, char
 	default:
         return false, ""
@@ -40,11 +40,11 @@ func ParseDirection(input string) directions.Direction{
 	return d
 }
 
-func newInputReader() *InputReader{
+func newInputReader() *inputReader{
 	c := make(chan string)
 	go readUserInput(c)
-	return &InputReader{
-		lastChar: c,
+	return &inputReader{
+		input: c,
 	}
 }
 
@@ -65,15 +65,9 @@ func readUserInput(c chan string){
     defer resetConsole()
 
 	var b []byte = make([]byte, 1)
-
-    // var lastChar string
     for {
         os.Stdin.Read(b)
         currentChar := string(b)
         c <- currentChar
-        // if currentChar != lastChar {
-            // c <- currentChar
-            // lastChar = currentChar
-        // }
     }
 }

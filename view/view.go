@@ -6,63 +6,53 @@ import (
 	"os"
 	"strings"
 
-	"github.com/turnerbenjamin/go_snake/entities"
-	"github.com/turnerbenjamin/go_snake/game"
+	"github.com/turnerbenjamin/go_snake/interfaces"
 	"github.com/turnerbenjamin/go_snake/utilities/directions"
 	"golang.org/x/term"
 )
-
-type TileDescriptionProvider interface {
-	getTileDescription(byte) TileDescription
-}
-
-type TileDescription interface {
-	getBackgroundColour() byte
-	getChars() string
-}
 
 type Ui interface {
 	Render()
 }
 
 type consoleUi struct {
-	drawBuf   *bytes.Buffer
-	inputReader *InputReader
+	drawBuf     *bytes.Buffer
+	inputReader *inputReader
 	windowWidth int
 }
 
-func CreateUi() *consoleUi{
-    ww, _, err := term.GetSize(int(os.Stdout.Fd()))
-    if err != nil {
-        panic("Unable to access terminal width")
-    }
+func CreateUi() *consoleUi {
+	ww, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		panic("Unable to access terminal width")
+	}
 	return &consoleUi{
-		drawBuf: new(bytes.Buffer),
+		drawBuf:     new(bytes.Buffer),
 		inputReader: newInputReader(),
 		windowWidth: ww,
 	}
 }
 
-func (ui *consoleUi) RenderWelcomeScreen(){
+func (ui *consoleUi) RenderWelcomeScreen() {
 	ui.clearScreen()
 	maxStringLength := getMaxStringLength(welcomeScreenTitle)
 	p := ui.getPaddingToCenter(maxStringLength)
-	for i, s := range welcomeScreenTitle{
+	for i, s := range welcomeScreenTitle {
 		c := ui.getTitleColor(i)
-    fmt.Printf("%s\033[38;5;%dm%s\033[0m\n", p, c, s)
+		fmt.Printf("%s\033[38;5;%dm%s\033[0m\n", p, c, s)
 	}
 
 	m := "Press any key to start"
 	p = ui.getPaddingToCenter(len(m))
 	fmt.Println()
 	fmt.Println()
-	fmt.Printf("%s%s\n", p,m)
+	fmt.Printf("%s%s\n", p, m)
 
-	ui.inputReader.readCharBlocking()
+	ui.inputReader.waitForInput()
 	ui.clearScreen()
 }
 
-func (ui *consoleUi) ShowGameOverMessage(score int) bool{
+func (ui *consoleUi) ShowGameOverMessage(score int) bool {
 	fmt.Print(strings.Repeat("\n", 2))
 
 	m := fmt.Sprintf("Game over: You scored %d points", score)
@@ -74,85 +64,89 @@ func (ui *consoleUi) ShowGameOverMessage(score int) bool{
 	p = ui.getPaddingToCenter(len(m))
 	fmt.Printf("%s%s", p, m)
 
-	for{
-		char := ui.inputReader.readCharBlocking()
+	for {
+		char := ui.inputReader.waitForInput()
 		if char == "y" {
 			ui.clearScreen()
 			return true
 		}
-		if char == "n"{
+		if char == "n" {
 			ui.clearScreen()
 			return false
 		}
 	}
 }
 
-func (ui *consoleUi) Init(){
+func (ui *consoleUi) Init() {
 	ui.clearScreen()
 	ui.hideCursor()
 }
 
-
-func (ui *consoleUi) CleanUp(){
+func (ui *consoleUi) CleanUp() {
 	ui.clearScreen()
 	ui.showCursor()
 }
 
-func (ui *consoleUi) CheckForUserInput() (bool, directions.Direction, string){
-	isInput, char := ui.inputReader.checkForCharInput()
+func (ui *consoleUi) CheckForUserInput() (bool, directions.Direction, string) {
+	isInput, char := ui.inputReader.checkForInput()
 	direction := ParseDirection(char)
 	return isInput, direction, char
 }
 
-
-func (ui *consoleUi) RenderLevel(l game.Level, score int) {
+func (ui *consoleUi) RenderComponent(c interfaces.Component, score int) {
 	ui.resetBuffer()
 
-	w := l.GetWidth()
-	h := l.GetHeight()
-	d := l.GetData()
-	p := ui.getPaddingToCenter(w*2) // width unit is 2 chars
+	w := c.GetWidth()
+	h := c.GetHeight()
+	d := c.GetData()
+	tdp := c.GetTileDescriptionProvider()
+	p := ui.getPaddingToCenter(w * 2) // width unit is 2 chars
 
 	fmt.Print(strings.Repeat("\n", 3))
 	m := fmt.Sprintf("SCORE: %d\n", score)
 	mp := ui.getPaddingToCenter(len(m))
-	fmt.Printf("%s%s",mp,m)
+	fmt.Printf("%s%s", mp, m)
 	fmt.Print(strings.Repeat("\n", 2))
 
 	for y := range h {
 		ui.drawBuf.WriteString(p)
 		for x := range w {
 			tc := d[y][x]
-			td := entities.GetTileDescription(tc)
-			ui.drawBuf.WriteString(td)
+			td := tdp.GetTileDescription(tc)
+			ui.drawBuf.WriteString(ui.tileDescriptionToString(td))
 		}
 		ui.drawBuf.WriteRune('\n')
 	}
 	fmt.Fprint(os.Stdout, ui.drawBuf.String())
 }
 
-func (ui *consoleUi) resetBuffer(){
+func (ui *consoleUi) resetBuffer() {
 	ui.drawBuf.Reset()
 	fmt.Print("\033[H")
 }
 
-func (ui *consoleUi) clearScreen(){
+func (ui *consoleUi) clearScreen() {
 	fmt.Print("\033[H\033[2J")
 }
 
-
-func (ui *consoleUi) hideCursor(){
-	fmt.Print("[2J\033[?25l");
+func (ui *consoleUi) hideCursor() {
+	fmt.Print("[2J\033[?25l")
 }
 
-func (ui *consoleUi) showCursor(){
-	fmt.Print("\033[?25h");
+func (ui *consoleUi) showCursor() {
+	fmt.Print("\033[?25h")
 }
 
-func (ui *consoleUi)getPaddingToCenter(elWidth int) string{
-	
+func (ui *consoleUi) tileDescriptionToString(td interfaces.TileDescription) string {
+	c := td.GetBackgroundColour()
+	t := td.GetText()
+	return fmt.Sprintf("\033[48;5;%dm%s\033[0m", c, t)
+}
+
+func (ui *consoleUi) getPaddingToCenter(elWidth int) string {
+
 	padding := (ui.windowWidth - elWidth) / 2
-	if padding < 0{
+	if padding < 0 {
 		return ""
 	}
 
@@ -183,18 +177,17 @@ var welcomeScreenTitle = []string{
 	`               ~--______-~                ~-___-~           `,
 }
 
-
-func (ui *consoleUi) getTitleColor(i int) int{
+func (ui *consoleUi) getTitleColor(i int) int {
 	base := 200
 	return i + base
 }
 
 func getMaxStringLength(a []string) int {
-    maxLength := 0
-    for _, str := range a {
-        if len(str) > maxLength {
-            maxLength = len(str)
-        }
-    }
-    return maxLength
+	maxLength := 0
+	for _, str := range a {
+		if len(str) > maxLength {
+			maxLength = len(str)
+		}
+	}
+	return maxLength
 }
